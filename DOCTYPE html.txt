@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Arcade: 🪐 寶星貪食蛇</title>
+    <style>
+        body {
+            background-color: #0b0c10;
+            color: #c5c6c7;
+            font-family: 'Courier New', Courier, monospace, '微軟正黑體';
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            color: #66fcf1;
+            text-shadow: 0 0 10px #66fcf1, 0 0 20px #66fcf1;
+            font-size: 2.5rem;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            color: #45f3ff;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        #game-container {
+            display: flex;
+            gap: 25px;
+            background-color: #1f2833;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(102, 252, 241, 0.2);
+            border: 2px solid #45f3ff;
+        }
+
+        #canvas-container {
+            position: relative;
+        }
+
+        canvas {
+            border: 4px solid #66fcf1;
+            background-color: #000;
+            box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.2);
+            display: block;
+        }
+
+        .shake {
+            animation: shakeEffect 0.3s ease-in-out;
+        }
+        @keyframes shakeEffect {
+            0%, 100% { transform: translate(0, 0); }
+            20%, 60% { transform: translate(-5px, 5px); }
+            40%, 80% { transform: translate(5px, -5px); }
+        }
+
+        #canvas-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.6);
+            color: #66fcf1;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #66fcf1;
+            display: none;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        #info-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 240px;
+        }
+
+        .status-box {
+            background-color: #0b0c10;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid #1f2833;
+        }
+
+        .status-box h3 {
+            margin: 0 0 12px 0;
+            border-bottom: 2px solid #66fcf1;
+            padding-bottom: 5px;
+            color: #45f3ff;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .highlight-text {
+            color: #66fcf1;
+            font-weight: bold;
+        }
+        
+        .player-text {
+            color: #ff007f;
+            font-weight: bold;
+            max-width: 130px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        ol {
+            margin: 0;
+            padding-left: 22px;
+        }
+
+        li {
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            color: #95a5a6;
+        }
+        li.top-rank {
+            color: #fff;
+            text-shadow: 0 0 5px #66fcf1;
+        }
+
+        #controls {
+            margin-top: 20px;
+            text-align: center;
+            position: relative;
+            z-index: 10; /* 確保按鈕在最上層，絕對不被擋住 */
+        }
+
+        button {
+            background-color: transparent;
+            border: 2px solid #66fcf1;
+            color: #66fcf1;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-family: inherit;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            text-shadow: 0 0 5px #66fcf1;
+            box-shadow: 0 0 10px rgba(102, 252, 241, 0.2);
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #66fcf1;
+            color: #0b0c10;
+            box-shadow: 0 0 20px #66fcf1;
+            text-shadow: none;
+        }
+
+        button:disabled {
+            border-color: #444;
+            color: #444;
+            text-shadow: none;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        #btnPause {
+            margin-left: 10px;
+            border-color: #ff007f;
+            color: #ff007f;
+            text-shadow: 0 0 5px #ff007f;
+        }
+        #btnPause:hover:not(:disabled) {
+            background-color: #ff007f;
+            color: #0b0c10;
+            box-shadow: 0 0 20px #ff007f;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>ARCADE SNAKE</h1>
+    <div class="subtitle">[ESC] 或 [P] 鍵可暫停遊戲 | 方向鍵控制</div>
+    
+    <div id="game-container">
+        <div id="canvas-container">
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
+            <div id="canvas-overlay">PAUSED</div>
+        </div>
+
+        <div id="info-panel">
+            <div>
+                <div class="status-box">
+                    <h3>STATUS 狀態</h3>
+                    <div class="status-row"><span>PLAYER 玩家:</span><span id="lblPlayer" class="player-text">PILOT 1</span></div>
+                    <div class="status-row"><span>SCORE 分數:</span><span id="lblScore" class="highlight-text">0</span></div>
+                    <div class="status-row"><span>TIME 時間:</span><span id="lblTime" class="highlight-text">0</span>s</div>
+                </div>
+
+                <div class="status-box">
+                    <h3>MISSION 任務</h3>
+                    <div class="status-row"><span>STAGE 關卡:</span><span id="lblLevel" class="highlight-text">1</span></div>
+                    <div class="status-row"><span>TARGET 目標:</span><span id="lblTarget" class="highlight-text">3</span></div>
+                    <div class="status-row"><span>EATEN 已吃:</span><span id="lblEaten" class="highlight-text">0</span></div>
+                </div>
+            </div>
+
+            <div class="status-box">
+                <h3>🏆 TOP 5 排行榜</h3>
+                <ol id="leaderboard"></ol>
+            </div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="btnStart">START GAME</button>
+        <button id="btnPause" disabled>PAUSE</button>
+    </div>
+
+    <script>
+        (function() {
+            const canvas = document.getElementById("gameCanvas");
+            if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+            const overlay = document.getElementById("canvas-overlay");
+
+            const gridSize = 20;
+            const tileCount = canvas.width / gridSize;
+            const levelTargets = [3, 6, 9, 12, 15]; 
+            const levelSpeeds = [140, 115, 95, 80, 65]; 
+
+            let currentPlayerName = "PILOT 1";
+            let snake = [];
+            let gems = [];
+            let dx = gridSize;
+            let dy = 0;
+            let nextDx = gridSize; 
+            let nextDy = 0;
+            let score = 0;
+            let currentLevel = 1;
+            let gemsEatenInLevel = 0;
+            
+            let gameInterval = null;
+            let timerInterval = null;
+            let timeElapsed = 0;
+            let isPlaying = false;
+            let isPaused = false;
+
+            // 點擊 START 直接開始，不彈窗
+            function runGameInitialization() {
+                isPlaying = true;
+                isPaused = false;
+                document.getElementById("btnStart").disabled = true;
+                document.getElementById("btnPause").disabled = false;
+                if (overlay) overlay.style.display = "none";
+
+                snake = [
+                    { x: gridSize * 5, y: gridSize * 5 },
+                    { x: gridSize * 4, y: gridSize * 5 },
+                    { x: gridSize * 3, y: gridSize * 5 }
+                ];
+                dx = gridSize; dy = 0;
+                nextDx = gridSize; nextDy = 0;
+                score = 0;
+                currentLevel = 1;
+                gemsEatenInLevel = 0;
+                timeElapsed = 0;
+
+                document.getElementById("lblScore").innerText = score;
+                document.getElementById("lblTime").innerText = timeElapsed;
+                
+                initLevel();
+                startTimer();
+            }
+
+            function startTimer() {
+                clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    if (!isPaused) {
+                        timeElapsed++;
+                        const lblTime = document.getElementById("lblTime");
+                        if (lblTime) lblTime.innerText = timeElapsed;
+                    }
+                }, 1000);
+            }
+
+            function initLevel() {
+                document.getElementById("lblLevel").innerText = currentLevel;
+                document.getElementById("lblTarget").innerText = levelTargets[currentLevel - 1];
+                document.getElementById("lblEaten").innerText = gemsEatenInLevel;
+
+                gems = [];
+                for (let i = 0; i < levelTargets[currentLevel - 1]; i++) {
+                    gems.push(getRandomPosition());
+                }
+
+                resetGameLoop();
+            }
+
+            function resetGameLoop() {
+                clearInterval(gameInterval);
+                gameInterval = setInterval(gameLoop, levelSpeeds[currentLevel - 1]);
+            }
+
+            function gameLoop() {
+                if (isPaused) return;
+                dx = nextDx;
+                dy = nextDy;
+                moveSnake();
+
+                if (checkGameOver()) {
+                    triggerScreenShake();
+                    endGame();
+                    return;
+                }
+
+                checkGemCollision();
+                draw();
+            }
+
+            function moveSnake() {
+                const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+                snake.unshift(head);
+                snake.pop(); 
+            }
+
+            function checkGemCollision() {
+                const head = snake[0];
+                for (let i = 0; i < gems.length; i++) {
+                    if (head.x === gems[i].x && head.y === gems[i].y) {
+                        score += 10 * currentLevel; 
+                        gemsEatenInLevel++;
+                        
+                        document.getElementById("lblScore").innerText = score;
+                        document.getElementById("lblEaten").innerText = gemsEatenInLevel;
+                        
+                        snake.push({ ...snake[snake.length - 1] });
+                        gems.splice(i, 1);
+
+                        if (gemsEatenInLevel >= levelTargets[currentLevel - 1]) {
+                            nextLevel();
+                        }
+                        break;
+                    }
+                }
+            }
+
+            function nextLevel() {
+                if (currentLevel < 5) {
+                    currentLevel++;
+                    gemsEatenInLevel = 0;
+                    
+                    if (overlay) {
+                        overlay.innerText = `STAGE ${currentLevel}`;
+                        overlay.style.display = "flex";
+                    }
+                    isPaused = true;
+                    setTimeout(() => {
+                        if (overlay) overlay.style.display = "none";
+                        isPaused = false;
+                        initLevel();
+                    }, 1200);
+                } else {
+                    alert("🏆 CONGRATULATIONS! 你全破通關了！");
+                    endGame();
+                }
+            }
+
+            function checkGameOver() {
+                if (snake.length === 0) return true;
+                const head = snake[0];
+                if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) return true;
+                for (let i = 1; i < snake.length; i++) {
+                    if (head.x === snake[i].x && head.y === snake[i].y) return true;
+                }
+                return false;
+            }
+
+            function triggerScreenShake() {
+                const container = document.getElementById("game-container");
+                if (container) {
+                    container.classList.add("shake");
+                    setTimeout(() => container.classList.remove("shake"), 300);
+                }
+            }
+
+            function togglePause() {
+                if (!isPlaying) return;
+                isPaused = !isPaused;
+                const btnPause = document.getElementById("btnPause");
+                if (isPaused) {
+                    if (overlay) {
+                        overlay.innerText = "PAUSED";
+                        overlay.style.display = "flex";
+                    }
+                    if (btnPause) btnPause.innerText = "RESUME";
+                } else {
+                    if (overlay) overlay.style.display = "none";
+                    if (btnPause) btnPause.innerText = "PAUSE";
+                }
+            }
+
+            function endGame() {
+                clearInterval(gameInterval);
+                clearInterval(timerInterval);
+                isPlaying = false;
+                document.getElementById("btnStart").disabled = false;
+                document.getElementById("btnPause").disabled = true;
+                document.getElementById("btnPause").innerText = "PAUSE";
+
+                setTimeout(() => {
+                    alert(`GAME OVER!\nYOUR SCORE: ${score}`);
+                    saveToLeaderboard(currentPlayerName, score, timeElapsed);
+                }, 300);
+            }
+
+            function drawBlank() {
+                ctx.fillStyle = "#000";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = "#111";
+                for(let i=0; i<canvas.width; i+=gridSize) {
+                    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+                }
+            }
+
+            document.getElementById("btnStart").addEventListener("click", runGameInitialization);
+            document.getElementById("btnPause").addEventListener("click", togglePause);
+
+            function draw() {
+                drawBlank();
+                snake.forEach((part, index) => {
+                    if (index === 0) {
+                        ctx.fillStyle = "#66fcf1"; 
+                    } else {
+                        let alpha = 1 - (index / snake.length) * 0.6;
+                        ctx.fillStyle = `rgba(69, 243, 255, ${alpha})`;
+                    }
+                    ctx.shadowBlur = index === 0 ? 10 : 0;
+                    ctx.shadowColor = "#66fcf1";
+                    ctx.fillRect(part.x + 1, part.y + 1, gridSize - 2, gridSize - 2);
+                });
+                ctx.shadowBlur = 0; 
+
+                gems.forEach(gem => {
+                    ctx.fillStyle = "#ff007f";
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = "#ff007f";
+                    ctx.beginPath();
+                    let centerX = gem.x + gridSize / 2;
+                    let centerY = gem.y + gridSize / 2;
+                    ctx.arc(centerX, centerY, gridSize / 2 - 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+                ctx.shadowBlur = 0;
+            }
+
+            function getRandomPosition() {
+                let pos; let overlap;
+                do {
+                    overlap = false;
+                    pos = {
+                        x: Math.floor(Math.random() * tileCount) * gridSize,
+                        y: Math.floor(Math.random() * tileCount) * gridSize
+                    };
+                    for (let part of snake) { if (part.x === pos.x && part.y === pos.y) { overlap = true; break; } }
+                    for (let gem of gems) { if (gem.x === pos.x && gem.y === pos.y) { overlap = true; break; } }
+                } while (overlap);
+                return pos;
+            }
+
+            window.addEventListener("keydown", function(e) {
+                if(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault(); 
+                if (!isPlaying) return;
+                if (e.code === "KeyP" || e.code === "Escape") { togglePause(); return; }
+                if (isPaused) return;
+
+                switch(e.code) {
+                    case "ArrowUp": case "KeyW": if (dy === 0) { nextDx = 0; nextDy = -gridSize; } break;
+                    case "ArrowDown": case "KeyS": if (dy === 0) { nextDx = 0; nextDy = gridSize; } break;
+                    case "ArrowLeft": case "KeyA": if (dx === 0) { nextDx = -gridSize; nextDy = 0; } break;
+                    case "ArrowRight": case "KeyD": if (dx === 0) { nextDx = gridSize; nextDy = 0; } break;
+                }
+            });
+
+            function getLeaderboard() {
+                const defaultBoard = [
+                    { name: "CYBER", score: 150, time: 45 },
+                    { name: "NEON", score: 100, time: 50 },
+                    { name: "RETRO", score: 60, time: 40 }
+                ];
+                try {
+                    const data = localStorage.getItem("snake_leaderboard");
+                    return data ? JSON.parse(data) : defaultBoard;
+                } catch(e) { return defaultBoard; }
+            }
+
+            function updateLeaderboardView() {
+                try {
+                    const records = getLeaderboard();
+                    const listEl = document.getElementById("leaderboard");
+                    if (!listEl) return;
+                    listEl.innerHTML = "";
+                    records.slice(0, 5).forEach((record, index) => {
+                        const li = document.createElement("li");
+                        if (index === 0) li.className = "top-rank";
+                        li.innerHTML = `<span>${record.name}</span> - <span class="highlight-text">${record.score}</span> (${record.time}s)`;
+                        listEl.appendChild(li);
+                    });
+                } catch(e) {}
+            }
+
+            function saveToLeaderboard(name, score, time) {
+                try {
+                    let records = getLeaderboard();
+                    records.push({ name: name, score: score, time: time });
+                    records.sort((a, b) => b.score - a.score || a.time - b.time);
+                    records = records.slice(0, 5);
+                    localStorage.setItem("snake_leaderboard", JSON.stringify(records));
+                } catch(e) {}
+                updateLeaderboardView();
+            }
+
+            updateLeaderboardView();
+            drawBlank();
+        })();
+    </script>
+</body>
+</html>
